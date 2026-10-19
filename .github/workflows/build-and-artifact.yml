@@ -3,7 +3,7 @@ name: Build and publish artifact
 on:
   push:
     branches:
-      - "POS SYstem"
+      - "Point-of-Sale-System"
 
 jobs:
   build:
