@@ -15,6 +15,9 @@ namespace Pos_System_CS
         // Printing helpers
         private List<Bitmap> _printPages;
         private int _currentPrintPage;
+
+        // UI helpers for items
+        private System.Windows.Forms.ListBox _lstItems;
         public Form1()
         {
             InitializeComponent();
@@ -37,7 +40,51 @@ namespace Pos_System_CS
 
         private void button13_Click(object sender, EventArgs e)
         {
+            try
+            {
+                // Create sale from DataGridView rows
+                var saleItems = new List<Pos_System_CS.Data.SaleItem>();
+                decimal total = 0m;
+                foreach (DataGridViewRow row in dataGridView1.Rows)
+                {
+                    if (row.IsNewRow) continue;
+                    string name = Convert.ToString(row.Cells[0].Value);
+                    int qty = 1;
+                    if (!int.TryParse(Convert.ToString(row.Cells[1].Value), out qty)) qty = 1;
+                    decimal amt = 0m;
+                    decimal.TryParse(Convert.ToString(row.Cells[2].Value), out amt);
 
+                    // Try to resolve item id by name
+                    var item = Pos_System_CS.Data.DataAccess.GetItems().Find(i => i.Name == name);
+                    int itemId = item?.Id ?? 0;
+
+                    saleItems.Add(new Pos_System_CS.Data.SaleItem { ItemId = itemId, Quantity = qty, Amount = amt });
+                    total += amt;
+                }
+
+                if (saleItems.Count == 0)
+                {
+                    MessageBox.Show("No items to sell.");
+                    return;
+                }
+
+                int saleId = Pos_System_CS.Data.DataAccess.CreateSale(total, saleItems);
+                if (saleId > 0)
+                {
+                    MessageBox.Show($"Sale recorded (Id: {saleId})");
+                    dataGridView1.Rows.Clear();
+                    UpdateTotals();
+                }
+                else
+                {
+                    MessageBox.Show("Failed to record sale. See log for details.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Pay button failed", ex);
+                MessageBox.Show("An error occurred while processing payment. See logs.");
+            }
         }
         Bitmap bitmap;
         private void button14_Click(object sender, EventArgs e)
@@ -108,6 +155,81 @@ namespace Pos_System_CS
                 this.Controls.Add(btnLogs);
             }
             catch { }
+            // Add items list on the right side for quick add
+            try
+            {
+                _lstItems = new System.Windows.Forms.ListBox();
+                _lstItems.Width = 300;
+                _lstItems.Height = 400;
+                _lstItems.Location = new Point(1400, 73);
+                _lstItems.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+                _lstItems.DoubleClick += LstItems_DoubleClick;
+                this.Controls.Add(_lstItems);
+
+                LoadItemsToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to create items list", ex);
+            }
+        }
+
+        private void LoadItemsToList()
+        {
+            try
+            {
+                _lstItems.Items.Clear();
+                var items = Pos_System_CS.Data.DataAccess.GetItems();
+                foreach (var it in items)
+                {
+                    _lstItems.Items.Add(it);
+                }
+                _lstItems.DisplayMember = "Name";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LoadItemsToList failed", ex);
+            }
+        }
+
+        private void LstItems_DoubleClick(object sender, EventArgs e)
+        {
+            try
+            {
+                var it = _lstItems.SelectedItem as Pos_System_CS.Data.Item;
+                if (it == null) return;
+                // Add to DataGridView: Item, Qty, Amount
+                dataGridView1.Rows.Add(it.Name, 1, it.Price.ToString("F2"));
+                UpdateTotals();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("LstItems_DoubleClick failed", ex);
+            }
+        }
+
+        private void UpdateTotals()
+        {
+            try
+            {
+                decimal subtotal = 0m;
+                foreach (DataGridViewRow row in dataGridView1.Rows)
+                {
+                    if (row.IsNewRow) continue;
+                    if (decimal.TryParse(Convert.ToString(row.Cells[2].Value), out var amount))
+                    {
+                        subtotal += amount;
+                    }
+                }
+                lblSubTotal.Text = subtotal.ToString("F2");
+                decimal tax = Math.Round(subtotal * 0.07m, 2);
+                lblTax.Text = tax.ToString("F2");
+                lblTotal.Text = (subtotal + tax).ToString("F2");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("UpdateTotals failed", ex);
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -222,6 +344,11 @@ namespace Pos_System_CS
         private void label1_Click_Log(object sender, EventArgs e)
         {
             Logger.LogInfo("lblBarCode clicked");
+        }
+
+        private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
         }
     }
 }

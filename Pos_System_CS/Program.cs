@@ -14,6 +14,15 @@ namespace Pos_System_CS
         [STAThread]
         static void Main()
         {
+            // Ensure local database exists before launching the UI
+            try
+            {
+                Pos_System_CS.Data.DatabaseInitializer.Initialize();
+            }
+            catch (Exception ex)
+            {
+                try { Logger.LogError("Failed to initialize database", ex); } catch { }
+            }
             // Global exception handlers
             Application.ThreadException += (sender, args) =>
             {

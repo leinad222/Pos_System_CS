@@ -1,0 +1,35 @@
+name: Build and publish artifact
+
+on:
+  push:
+    branches:
+      - "POS SYstem"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild path
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Restore NuGet
+      run: nuget restore Pos_System_CS.slnx
+
+    - name: Build solution
+      run: msbuild Pos_System_CS.slnx /p:Configuration=Release
+
+    - name: Create artifact ZIP
+      run: |
+        mkdir artifact
+        xcopy /s /y "Pos_System_CS\bin\Release\*" artifact\
+        powershell -NoProfile -Command "Compress-Archive -Path artifact\* -DestinationPath pos_system_artifact.zip"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: pos-system-artifact
+        path: pos_system_artifact.zip
